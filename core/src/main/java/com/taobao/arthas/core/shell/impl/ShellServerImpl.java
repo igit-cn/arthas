@@ -1,5 +1,7 @@
 package com.taobao.arthas.core.shell.impl;
 
+import com.alibaba.arthas.deps.org.slf4j.Logger;
+import com.alibaba.arthas.deps.org.slf4j.LoggerFactory;
 import com.taobao.arthas.core.server.ArthasBootstrap;
 import com.taobao.arthas.core.shell.Shell;
 import com.taobao.arthas.core.shell.ShellServer;
@@ -17,8 +19,6 @@ import com.taobao.arthas.core.shell.system.impl.InternalCommandManager;
 import com.taobao.arthas.core.shell.system.impl.JobControllerImpl;
 import com.taobao.arthas.core.shell.term.Term;
 import com.taobao.arthas.core.shell.term.TermServer;
-import com.taobao.arthas.core.util.LogUtil;
-import com.taobao.middleware.logger.Logger;
 
 import java.lang.instrument.Instrumentation;
 import java.util.ArrayList;
@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ShellServerImpl extends ShellServer {
 
-    private static final Logger logger = LogUtil.getArthasLogger();
+    private static final Logger logger = LoggerFactory.getLogger(ShellServerImpl.class);
 
     private final CopyOnWriteArrayList<CommandResolver> resolvers;
     private final InternalCommandManager commandManager;
@@ -177,12 +177,13 @@ public class ShellServerImpl extends ShellServer {
         if (job != null) {
             // close shell's foreground job
             job.terminate();
-            logger.info(null, "Session {} closed, so terminate foreground job, id: {}, line: {}",
+            logger.info("Session {} closed, so terminate foreground job, id: {}, line: {}",
                         shell.session().getSessionId(), job.id(), job.line());
         }
 
         synchronized (ShellServerImpl.this) {
             sessions.remove(shell.id);
+            shell.close("network error");
             completeSessionClosed = sessions.isEmpty() && closed;
         }
         if (completeSessionClosed) {

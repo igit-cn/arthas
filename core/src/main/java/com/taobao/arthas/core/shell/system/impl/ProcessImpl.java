@@ -1,5 +1,7 @@
 package com.taobao.arthas.core.shell.system.impl;
 
+import com.alibaba.arthas.deps.org.slf4j.Logger;
+import com.alibaba.arthas.deps.org.slf4j.LoggerFactory;
 import com.taobao.arthas.core.advisor.AdviceListener;
 import com.taobao.arthas.core.advisor.AdviceWeaver;
 import com.taobao.arthas.core.server.ArthasBootstrap;
@@ -12,17 +14,17 @@ import com.taobao.arthas.core.shell.handlers.Handler;
 import com.taobao.arthas.core.shell.session.Session;
 import com.taobao.arthas.core.shell.system.ExecStatus;
 import com.taobao.arthas.core.shell.system.Process;
+import com.taobao.arthas.core.shell.system.ProcessAware;
 import com.taobao.arthas.core.shell.term.Tty;
-import com.taobao.arthas.core.util.LogUtil;
 import com.taobao.arthas.core.util.usage.StyledUsageFormatter;
 import com.taobao.middleware.cli.CLIException;
 import com.taobao.middleware.cli.CommandLine;
 import com.taobao.middleware.cli.UsageMessageFormatter;
-import com.taobao.middleware.logger.Logger;
 import com.taobao.text.Color;
 
 import io.termd.core.function.Function;
 
+import java.lang.instrument.ClassFileTransformer;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
@@ -33,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ProcessImpl implements Process {
 
-    private static final Logger logger = LogUtil.getArthasLogger();
+    private static final Logger logger = LoggerFactory.getLogger(ProcessImpl.class);
 
     private Command commandContext;
     private Handler<CommandProcess> handler;
@@ -347,7 +349,7 @@ public class ProcessImpl implements Process {
             return;
         }
 
-        process = new CommandProcessImpl(args2, tty, cl);
+        process = new CommandProcessImpl(this, args2, tty, cl);
         if (cacheLocation() != null) {
             process.echoTips("job id  : " + this.jobId + "\n");
             process.echoTips("cache location  : " + cacheLocation() + "\n");
@@ -369,23 +371,25 @@ public class ProcessImpl implements Process {
             try {
                 handler.handle(process);
             } catch (Throwable t) {
-                logger.error(null, "Error during processing the command:", t);
-                process.write("Error during processing the command: " + t.getMessage() + "\n");
+                logger.error("Error during processing the command:", t);
+                process.write("Error during processing the command, exception type: " + t.getClass().getName() + ", message:" + t.getMessage()
+                        + ", please check $HOME/logs/arthas/arthas.log for more details. \n");
                 terminate(1, null);
             }
         }
     }
 
     private class CommandProcessImpl implements CommandProcess {
-
+        private final Process process;
         private final List<String> args2;
         private final Tty tty;
         private final CommandLine commandLine;
-        private int enhanceLock = -1;
         private AtomicInteger times = new AtomicInteger();
-        private AdviceListener suspendedListener = null;
+        private AdviceListener listener = null;
+        private ClassFileTransformer transformer;
 
-        public CommandProcessImpl(List<String> args2, Tty tty, CommandLine commandLine) {
+        public CommandProcessImpl(Process process, List<String> args2, Tty tty, CommandLine commandLine) {
+            this.process = process;
             this.args2 = args2;
             this.tty = tty;
             this.commandLine = commandLine;
@@ -523,29 +527,48 @@ public class ProcessImpl implements Process {
         }
 
         @Override
-        public void register(int enhanceLock, AdviceListener listener) {
-            this.enhanceLock = enhanceLock;
-            AdviceWeaver.reg(enhanceLock, listener);
+        public void register(AdviceListener listener, ClassFileTransformer transformer) {
+            if (listener instanceof ProcessAware) {
+                ProcessAware processAware = (ProcessAware) listener;
+                // listener 有可能是其它 command 创建的
+                if(processAware.getProcess() == null) {
+                    processAware.setProcess(this.process);
+                }
+            }
+            AdviceWeaver.reg(listener);
+            
+            this.transformer = transformer;
         }
 
         @Override
         public void unregister() {
-            AdviceWeaver.unReg(enhanceLock);
+            if (transformer != null) {
+                ArthasBootstrap.getInstance().getTransformerManager().removeTransformer(transformer);
+            }
+            
+            if (listener instanceof ProcessAware) {
+                // listener有可能其它 command 创建的，所以不能unRge
+                if (this.process.equals(((ProcessAware) listener).getProcess())) {
+                    AdviceWeaver.unReg(listener);
+                }
+            } else {
+                AdviceWeaver.unReg(listener);
+            }
         }
 
         @Override
         public void resume() {
-            if (this.enhanceLock >= 0 && suspendedListener != null) {
-                AdviceWeaver.resume(enhanceLock, suspendedListener);
-                suspendedListener = null;
-            }
+//            if (suspendedListener != null) {
+//                AdviceWeaver.resume(suspendedListener);
+//                suspendedListener = null;
+//            }
         }
 
         @Override
         public void suspend() {
-            if (this.enhanceLock >= 0) {
-                suspendedListener = AdviceWeaver.suspend(enhanceLock);
-            }
+//            if (this.enhanceLock >= 0) {
+//                suspendedListener = AdviceWeaver.suspend(enhanceLock);
+//            }
         }
 
         @Override
