@@ -18,9 +18,11 @@
 
     <script type="text/javascript">
         window.addEventListener('resize', function () {
-            var terminalSize = getTerminalSize();
-            ws.send(JSON.stringify({ action: 'resize', cols: terminalSize.cols, rows: terminalSize.rows }));
-            xterm.resize(terminalSize.cols, terminalSize.rows);
+            if(ws !== undefined && ws !== null){
+                let terminalSize = getTerminalSize();
+                ws.send(JSON.stringify({ action: 'resize', cols: terminalSize.cols, rows: terminalSize.rows }));
+                xterm.resize(terminalSize.cols, terminalSize.rows);
+            }
         });
     </script>
 
@@ -44,11 +46,11 @@
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item active">
-                    <a class="nav-link" href="https://alibaba.github.io/arthas" target="_blank">Documentation
+                    <a class="nav-link" href="https://arthas.aliyun.com/doc" target="_blank">Documentation
                         <span class="sr-only">(current)</span></a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="https://alibaba.github.io/arthas/arthas-tutorials" target="_blank">Online Tutorials</a>
+                    <a class="nav-link" href="https://arthas.aliyun.com/doc/arthas-tutorials.html" target="_blank">Online Tutorials</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="https://github.com/alibaba/arthas" target="_blank">Github</a>

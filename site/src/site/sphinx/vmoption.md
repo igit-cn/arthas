@@ -1,6 +1,8 @@
 vmoption
 ===
 
+[`vmoption`在线教程](https://arthas.aliyun.com/doc/arthas-tutorials.html?language=cn&id=command-vmoption)
+
 > 查看，更新VM诊断相关的参数
 
 ### 使用参考
@@ -38,16 +40,26 @@ vmoption
 #### 查看指定的option
 
 ```bash
-[arthas@56963]$ vmoption PrintGCDetails
- KEY                    VALUE                   ORIGIN                 WRITEABLE
----------------------------------------------------------------------------------------------
- PrintGCDetails         false                   MANAGEMENT             true
+$ vmoption PrintGC
+ KEY                 VALUE                ORIGIN              WRITEABLE
+---------------------------------------------------------------------------------
+ PrintGC             false                MANAGEMENT          true
 ```
 
 #### 更新指定的option
 
 ```bash
-[arthas@56963]$ vmoption PrintGCDetails true
+$ vmoption PrintGC true
 Successfully updated the vm option.
-PrintGCDetails=true
+ NAME     BEFORE-VALUE  AFTER-VALUE
+------------------------------------
+ PrintGC  false         true
+```
+
+```bash
+$ vmoption PrintGCDetails true
+Successfully updated the vm option.
+ NAME            BEFORE-VALUE  AFTER-VALUE
+-------------------------------------------
+ PrintGCDetails  false         true
 ```

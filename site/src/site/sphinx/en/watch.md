@@ -1,6 +1,8 @@
 watch
 =====
 
+[`watch` online tutorial](https://arthas.aliyun.com/doc/arthas-tutorials.html?language=en&id=command-watch)
+
 Monitor methods in data aspect including `return values`, `exceptions` and `parameters`.
 
 With the help of [OGNL](https://commons.apache.org/proper/commons-ognl/index.html), you can easily check the details of variables when methods being invoked.
@@ -13,7 +15,7 @@ There are four different scenarios for `watch` command, which makes it rather co
 |---:|:---|
 |*class-pattern*|pattern for the class name|
 |*method-pattern*|pattern for the method name|
-|*expression*|expression to monitor|
+|*expression*|expression to watch, default value `{params, target, returnObj}`|
 |*condition-expression*|condition expression to filter|
 |[b]|before method being invoked|
 |[e]|when method encountering exceptions|
@@ -28,7 +30,7 @@ F.Y.I
 3. at the *watching* point, Arthas will use the *expression* to evaluate the variables and print them out;
 4. `in parameters` and `out parameters` are different since they can be modified within the invoked methods; `params` stands for `in parameters` in `-b`while `out parameters` in other *watching* points;
 5. there are no `return values` and `exceptions` when using `-b`.
-
+6. In the result of the watch command, the `location` information will be printed. There are three possible values for `location`: `AtEnter`, `AtExit`, and `AtExceptionExit`. Corresponding to the method entry, the method returns normally, and the method throws an exception.
 
 Advanced:
 * [Critical fields in *expression*](advice-class.md)
@@ -39,27 +41,46 @@ Advanced:
 
 #### Start Demo
 
-Start `arthas-demo` in [Quick Start](quick-start.md).
+Start `math-game` in [Quick Start](quick-start.md).
 
-#### Check the `out parameters` and `return value`
+#### Check the `out parameters`, `this` and `return value`
+
+> The expression to watch, default value `{params, target, returnObj}`
 
 ```bash
-$ watch demo.MathGame primeFactors "{params,returnObj}" -x 2
-Press Ctrl+C to abort.
-Affect(class-cnt:1 , method-cnt:1) cost in 44 ms.
-ts=2018-12-03 19:16:51; [cost=1.280502ms] result=@ArrayList[
+$ watch demo.MathGame primeFactors -x 2
+Press Q or Ctrl+C to abort.
+Affect(class count: 1 , method count: 1) cost in 32 ms, listenerId: 5
+method=demo.MathGame.primeFactors location=AtExceptionExit
+ts=2021-08-31 15:22:57; [cost=0.220625ms] result=@ArrayList[
     @Object[][
-        @Integer[535629513],
+        @Integer[-179173],
+    ],
+    @MathGame[
+        random=@Random[java.util.Random@31cefde0],
+        illegalArgumentCount=@Integer[44],
+    ],
+    null,
+]
+method=demo.MathGame.primeFactors location=AtExit
+ts=2021-08-31 15:22:58; [cost=1.020982ms] result=@ArrayList[
+    @Object[][
+        @Integer[1],
+    ],
+    @MathGame[
+        random=@Random[java.util.Random@31cefde0],
+        illegalArgumentCount=@Integer[44],
     ],
     @ArrayList[
-        @Integer[3],
-        @Integer[19],
-        @Integer[191],
-        @Integer[49199],
+        @Integer[2],
+        @Integer[2],
+        @Integer[26947],
     ],
 ]
 ```
 
+* In the above result, the method is executed twice, the first result is `location=AtExceptionExit`, indicating that the method throws an exception, so `returnObj` is null
+* In the second result is `location=AtExit`, indicating that the method returns normally, so you can see that the result of `returnObj` is an ArrayList
 #### Check `in parameters`
 
 ```bash
@@ -88,7 +109,7 @@ Press Ctrl+C to abort.
 Affect(class-cnt:1 , method-cnt:1) cost in 46 ms.
 ts=2018-12-03 19:29:54; [cost=0.01696ms] result=@ArrayList[
     @Object[][
-        @Integer[1544665400],
+        @Integer[1],
     ],
     @MathGame[
         random=@Random[java.util.Random@522b408a],
@@ -98,7 +119,7 @@ ts=2018-12-03 19:29:54; [cost=0.01696ms] result=@ArrayList[
 ]
 ts=2018-12-03 19:29:54; [cost=4.277392ms] result=@ArrayList[
     @Object[][
-        @Integer[1544665400],
+        @Integer[1],
     ],
     @MathGame[
         random=@Random[java.util.Random@522b408a],
@@ -131,7 +152,7 @@ Press Ctrl+C to abort.
 Affect(class-cnt:1 , method-cnt:1) cost in 58 ms.
 ts=2018-12-03 19:34:19; [cost=0.587833ms] result=@ArrayList[
     @Object[][
-        @Integer[47816758],
+        @Integer[1],
     ],
     @MathGame[
         random=@Random[
@@ -197,7 +218,7 @@ Press Ctrl+C to abort.
 Affect(class-cnt:1 , method-cnt:1) cost in 66 ms.
 ts=2018-12-03 19:40:28; [cost=2112.168897ms] result=@ArrayList[
     @Object[][
-        @Integer[2141897465],
+        @Integer[1],
     ],
     @ArrayList[
         @Integer[5],
@@ -232,3 +253,77 @@ Affect(class-cnt:1 , method-cnt:1) cost in 67 ms.
 ts=2018-12-03 20:04:34; [cost=131.303498ms] result=@Integer[8]
 ts=2018-12-03 20:04:35; [cost=0.961441ms] result=@Integer[8]
 ``` 
+
+#### Get a static field and calling a static method 
+
+```bash
+watch demo.MathGame * '{params,@demo.MathGame@random.nextInt(100)}' -v -n 1 -x 2
+[arthas@6527]$ watch demo.MathGame * '{params,@demo.MathGame@random.nextInt(100)}' -n 1 -x 2
+Press Q or Ctrl+C to abort.
+Affect(class count: 1 , method count: 5) cost in 34 ms, listenerId: 3
+ts=2021-01-05 21:35:20; [cost=0.173966ms] result=@ArrayList[
+    @Object[][
+        @Integer[-138282],
+    ],
+    @Integer[89],
+]
+```
+
+* Note that here you use `Thread.currentThread().getContextClassLoader()` to load, and it is better to use the exact `classloader` [ognl](ognl.md).
+
+
+#### Exclude the specified class
+
+> The watch/trace/monitor/stack/tt commands all support the `--exclude-class-pattern` parameter
+
+Use the `--exclude-class-pattern` parameter to exclude the specified class, for example:
+
+```bash
+watch javax.servlet.Filter * --exclude-class-pattern com.demo.TestFilter
+```
+#### Does not match subclass
+
+By default, the watch/trace/monitor/stack/tt commands will match subclass. If you don't want to match, you can turn it off.
+
+```bash
+options disable-sub-class true
+```
+
+
+#### Use the -v parameter to print more information
+
+> The watch/trace/monitor/stack/tt commands all support the `-v` parameter.
+
+When the command is executed, there is no output result. There are two possibilities:
+
+1. The matched function is not executed
+2. The result of the conditional expression is false
+
+But the user cannot tell which situation is.
+
+Using the `-v` option, the specific value and execution result of `Condition express` will be printed for easy confirmation.
+
+such as:
+
+```
+$ watch -v -x 2 demo.MathGame print 'params' 'params[0] > 100000'
+Press Q or Ctrl+C to abort.
+Affect(class count: 1 , method count: 1) cost in 29 ms, listenerId: 11
+Condition express: params[0] > 100000 , result: false
+Condition express: params[0] > 100000 , result: false
+Condition express: params[0] > 100000 , result: true
+ts=2020-12-02 22:38:56; [cost=0.060843ms] result=@Object[][
+    @Integer[1],
+    @ArrayList[
+        @Integer[200033],
+    ],
+]
+Condition express: params[0] > 100000 , result: true
+ts=2020-12-02 22:38:57; [cost=0.052877ms] result=@Object[][
+    @Integer[1],
+    @ArrayList[
+        @Integer[29],
+        @Integer[4243],
+    ],
+]
+```

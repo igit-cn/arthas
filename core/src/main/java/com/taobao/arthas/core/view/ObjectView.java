@@ -1,5 +1,7 @@
 package com.taobao.arthas.core.view;
 
+import com.alibaba.arthas.deps.org.slf4j.Logger;
+import com.alibaba.arthas.deps.org.slf4j.LoggerFactory;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.taobao.arthas.core.GlobalOptions;
@@ -18,7 +20,7 @@ import static java.lang.String.format;
  * Created by vlinux on 15/5/20.
  */
 public class ObjectView implements View {
-
+    private static final Logger logger = LoggerFactory.getLogger(ObjectView.class);
     private final static int MAX_OBJECT_LENGTH = 10 * 1024 * 1024; // 10M
 
     private final Object object;
@@ -50,7 +52,9 @@ public class ObjectView implements View {
                     .append(", try to specify -M size_limit in your command, check the help command for more.");
             return buf.toString();
         } catch (Throwable t) {
-            return "ERROR DATA!!! exception message: " + t.getMessage();
+            logger.error("ObjectView draw error, object class: {}", object.getClass(), t);
+            return "ERROR DATA!!! object class: " + object.getClass() + ", exception class: " + t.getClass()
+                    + ", exception message: " + t.getMessage();
         }
     }
 
@@ -582,49 +586,44 @@ public class ObjectView implements View {
                     appendStringBuilder(buf, format("@%s[%s]", className, obj));
                 } else {
                     appendStringBuilder(buf, format("@%s[", className));
-                    List<Field> fields = new ArrayList<Field>();
-                    Class objClass = obj.getClass();
+                    final List<Field> fields;
+                    Class<?> objClass = obj.getClass();
                     if (GlobalOptions.printParentFields) {
+                        fields = new ArrayList<Field>();
                         // 当父类为null的时候说明到达了最上层的父类(Object类).
                         while (objClass != null) {
-                            for (Field field : objClass.getDeclaredFields()) {
-                                fields.add(field);
-                            }
+                            fields.addAll(Arrays.asList(objClass.getDeclaredFields()));
                             objClass = objClass.getSuperclass();
                         }
                     } else {
-                        for (Field field : objClass.getDeclaredFields()) {
-                            fields.add(field);
-                        }
+                        fields = new ArrayList<Field>(Arrays.asList(objClass.getDeclaredFields()));
                     }
 
-                    if (null != fields) {
-                        for (Field field : fields) {
+                    for (Field field : fields) {
 
-                            field.setAccessible(true);
+                        field.setAccessible(true);
 
-                            try {
+                        try {
 
-                                final Object value = field.get(obj);
+                            final Object value = field.get(obj);
 
-                                appendStringBuilder(buf, "\n");
-                                for (int i = 0; i < deep+1; i++) {
-                                    appendStringBuilder(buf, TAB);
-                                }
-                                appendStringBuilder(buf, field.getName());
-                                appendStringBuilder(buf, "=");
-                                renderObject(value, deep + 1, expand, buf);
-                                appendStringBuilder(buf, ",");
-
-                            } catch (ObjectTooLargeException t) {
-                                buf.append("...");
-                                break;
-                            } catch (Throwable t) {
-                                // ignore
+                            appendStringBuilder(buf, "\n");
+                            for (int i = 0; i < deep+1; i++) {
+                                appendStringBuilder(buf, TAB);
                             }
-                        }//for
-                        appendStringBuilder(buf, "\n");
-                    }//if
+                            appendStringBuilder(buf, field.getName());
+                            appendStringBuilder(buf, "=");
+                            renderObject(value, deep + 1, expand, buf);
+                            appendStringBuilder(buf, ",");
+
+                        } catch (ObjectTooLargeException t) {
+                            buf.append("...");
+                            break;
+                        } catch (Throwable t) {
+                            // ignore
+                        }
+                    }//for
+                    appendStringBuilder(buf, "\n");
                     for (int i = 0; i < deep; i++) {
                         appendStringBuilder(buf, TAB);
                     }

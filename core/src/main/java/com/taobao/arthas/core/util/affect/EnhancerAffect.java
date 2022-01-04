@@ -113,8 +113,17 @@ public final class EnhancerAffect extends Affect {
         this.throwable = throwable;
     }
 
+    public Collection<File> getClassDumpFiles() {
+        return classDumpFiles;
+    }
+
+    public List<String> getMethods() {
+        return methods;
+    }
+
     @Override
     public String toString() {
+        //TODO removing EnhancerAffect.toString(), replace with ViewRenderUtil.renderEnhancerAffect()
         final StringBuilder infoSB = new StringBuilder();
         if (GlobalOptions.isDump
                 && !classDumpFiles.isEmpty()) {
@@ -135,7 +144,7 @@ public final class EnhancerAffect extends Affect {
                 cost(),
                 listenerId));
         if (this.throwable != null) {
-            infoSB.append("\nEnhance error! exception: " + this.throwable);
+            infoSB.append("\nEnhance error! exception: ").append(this.throwable);
         }
         return infoSB.toString();
     }
